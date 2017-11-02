@@ -32,7 +32,7 @@ type connection interface {
 
 func New(options ...func(*Client) error) (*Client, error) {
 	c := Client{
-		timeout:     time.Second * 10,
+		timeout:     time.Second * 30,
 		broadcast:   true,
 		generateXID: CryptoGenerateXID,
 	}
@@ -137,16 +137,20 @@ func PrintPacket(p dhcp4.Packet) {
 func (c *Client) SendDiscoverPacket() (dhcp4.Packet, error) {
 	discoveryPacket := c.DiscoverPacket()
 	discoveryPacket.PadToMinSize()
-	log.Println("Sending discovery packet", discoveryPacket.CIAddr())
+	log.Println("Sending discovery packet")
 	PrintPacket(discoveryPacket)
-
 	return discoveryPacket, c.SendPacket(discoveryPacket)
 }
 
 //Retreive Offer...
 //Wait for the offer for a specific Discovery Packet.
 func (c *Client) GetOffer(discoverPacket *dhcp4.Packet) (dhcp4.Packet, error) {
+	log.Println("minglog: GetOffer")
+	var i = 0
 	for {
+		log.Println("minglog: i: ", i)
+		i = i + 1
+
 		c.connection.SetReadTimeout(c.timeout)
 		readBuffer, source, err := c.connection.ReadFrom()
 		if err != nil {
@@ -167,10 +171,13 @@ func (c *Client) GetOffer(discoverPacket *dhcp4.Packet) (dhcp4.Packet, error) {
 			}
 		}
 
-		if len(offerPacketOptions[dhcp4.OptionDHCPMessageType]) < 1 || dhcp4.MessageType(offerPacketOptions[dhcp4.OptionDHCPMessageType][0]) != dhcp4.Offer || !bytes.Equal(discoverPacket.XId(), offerPacket.XId()) {
+		if len(offerPacketOptions[dhcp4.OptionDHCPMessageType]) < 1 || dhcp4.MessageType(offerPacketOptions[dhcp4.OptionDHCPMessageType][0]) != dhcp4.Offer {
+		//if len(offerPacketOptions[dhcp4.OptionDHCPMessageType]) < 1 || dhcp4.MessageType(offerPacketOptions[dhcp4.OptionDHCPMessageType][0]) != dhcp4.Offer || !bytes.Equal(discoverPacket.XId(), offerPacket.XId()) {
 			continue
 		}
 
+		log.Println("Ming log: Get offer packet", offerPacket)
+		PrintPacket(offerPacket)
 		return offerPacket, nil
 	}
 
@@ -241,6 +248,26 @@ func (c *Client) DiscoverPacket() dhcp4.Packet {
 
 	packet.AddOption(dhcp4.OptionDHCPMessageType, []byte{byte(dhcp4.Discover)})
 	//packet.PadToMinSize()
+	return packet
+}
+
+func DiscoverPacket(mac string) dhcp4.Packet {
+	//messageid := make([]byte, 4)
+	//c.generateXID(messageid)
+
+	packet := dhcp4.NewPacket(dhcp4.BootRequest)
+	var macaddr net.HardwareAddr
+	if (mac != "") {
+		macaddr, _ = net.ParseMAC(mac)
+	} else {
+		macaddr, _ = net.ParseMAC("08-00-27-00-A8-E8")
+	}
+	packet.SetCHAddr(macaddr)
+	//packet.SetXId(messageid)
+	packet.SetBroadcast(true)
+
+	packet.AddOption(dhcp4.OptionDHCPMessageType, []byte{byte(dhcp4.Discover)})
+	packet.PadToMinSize()
 	return packet
 }
 
@@ -351,6 +378,52 @@ func (c *Client) Request() (bool, dhcp4.Packet, error) {
 	}
 
 	return true, acknowledgement, nil
+}
+
+// Only do discovery and offer.
+func (c *Client) DiscoverAndOffer() (bool, dhcp4.Packet, error) {
+	//go c.GetOffer(nil)
+	//go c.SendDiscoverPacket()
+
+	//discoveryPacket, err := c.SendDiscoverPacket()
+	//log.Println("SendDiscoverPacket Packet:", discoveryPacket)
+	//log.Println("SendDiscoverPacket err:", err)
+	//if err != nil {
+	//	return false, discoveryPacket, err
+	//}
+
+	//log.Println("minglog sleep")
+	//time.Sleep(30 * time.Second)
+	//return true, discoveryPacket, nil
+
+	log.Println("Get offer only")
+	offerPacket, err := c.GetOffer(nil)
+	//offerPacket, err := c.GetOffer(&discoveryPacket)
+	log.Println("GetOffer Packet:", offerPacket)
+	log.Println("GetOffer err:", err)
+	if err != nil {
+		return false, offerPacket, err
+	}
+
+	log.Println("DiscoverAndOffer success")
+	return true, offerPacket, nil
+
+	//requestPacket, err := c.SendRequest(&offerPacket)
+	//if err != nil {
+	//	return false, requestPacket, err
+	//}
+	//
+	//acknowledgement, err := c.GetAcknowledgement(&requestPacket)
+	//if err != nil {
+	//	return false, acknowledgement, err
+	//}
+	//
+	//acknowledgementOptions := acknowledgement.ParseOptions()
+	//if dhcp4.MessageType(acknowledgementOptions[dhcp4.OptionDHCPMessageType][0]) != dhcp4.ACK {
+	//	return false, acknowledgement, nil
+	//}
+	//
+	//return true, acknowledgement, nil
 }
 
 //Renew a lease backed on the Acknowledgement Packet.
