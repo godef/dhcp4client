@@ -5,7 +5,8 @@ import (
 	"net"
 	"time"
 
-	"github.com/d2g/dhcp4"
+	"github.com/mingzhaodotname/dhcp4"
+	"log"
 )
 
 const (
@@ -112,10 +113,32 @@ func (c *Client) Close() error {
 	return nil
 }
 
+func PrintPacket(p dhcp4.Packet) {
+	log.Println("OpCode    :", p.OpCode())
+	log.Println("HType     :", p.HType())
+	log.Println("HLen      :", p.HLen())
+	log.Println("Hops      :", p.Hops())
+	log.Println("XId       :", p.XId())
+	log.Println("Secs      :", p.Secs())
+	log.Println("Flags     :", p.Flags())
+	log.Println("CIAddr    :", p.CIAddr())
+	log.Println("YIAddr    :", p.YIAddr())
+	log.Println("SIAddr    :", p.SIAddr())
+	log.Println("GIAddr    :", p.GIAddr())
+	log.Println("CHAddr    :", p.CHAddr())
+	log.Println("Broadcast :", p.Broadcast())
+	log.Println("Options   :", p.Options())
+	for k, v := range p.Options() {
+		log.Println("Option   name:", k, ", value:", v)
+	}
+}
+
 //Send the Discovery Packet to the Broadcast Channel
 func (c *Client) SendDiscoverPacket() (dhcp4.Packet, error) {
 	discoveryPacket := c.DiscoverPacket()
 	discoveryPacket.PadToMinSize()
+	log.Println("Sending discovery packet", discoveryPacket.CIAddr())
+	PrintPacket(discoveryPacket)
 
 	return discoveryPacket, c.SendPacket(discoveryPacket)
 }
